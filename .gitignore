@@ -1,2 +1,5 @@
 /target
 output.log
+logs/
+wallets/
+*.sh
