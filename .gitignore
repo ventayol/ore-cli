@@ -3,3 +3,4 @@ output.log
 logs/
 wallets/
 *.sh
+*.log

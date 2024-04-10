@@ -22,10 +22,10 @@ use log::{error, info};
 
 const RPC_RETRIES: usize = 0;
 const SIMULATION_RETRIES: usize = 4;
-const GATEWAY_RETRIES: usize = 4;
-const CONFIRM_RETRIES: usize = 4;
+const GATEWAY_RETRIES: usize = 10;
+const CONFIRM_RETRIES: usize = 12;
 
-const CONFIRM_DELAY: u64 = 5000;
+const CONFIRM_DELAY: u64 = 2000;
 const GATEWAY_DELAY: u64 = 2000;
 
 impl Miner {

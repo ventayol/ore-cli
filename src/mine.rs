@@ -42,11 +42,12 @@ impl Miner {
                 (treasury.reward_rate as f64) / (10f64.powf(ore::TOKEN_DECIMALS as f64));
 
             println!(
-                "{} - Balance: {} ORE, Claimable: {} ORE, Reward rate: {} ORE",
+                "{} - Balance: {} ORE, Claimable: {} ORE, Reward rate: {} ORE, Fee: {}",
                 Local::now().format("%Y-%m-%d %H:%M:%S"),
                 balance,
                 rewards,
-                reward_rate
+                reward_rate,
+                self.priority_fee
             );
 
             // Escape sequence that clears the screen and the scrollback buffer
