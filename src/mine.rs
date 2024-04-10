@@ -1,5 +1,4 @@
 use std::{
-    io::{stdout, Write},
     sync::{atomic::AtomicBool, Arc, Mutex},
 };
 
@@ -18,6 +17,9 @@ use crate::{
     Miner,
 };
 
+use chrono::Local;
+use log::{error, info};
+
 // Odds of being selected to submit a reset tx
 const RESET_ODDS: u64 = 20;
 
@@ -26,7 +28,6 @@ impl Miner {
         // Register, if needed.
         let signer = self.signer();
         self.register().await;
-        let mut stdout = stdout();
         let mut rng = rand::thread_rng();
 
         // Start mining loop
@@ -39,19 +40,23 @@ impl Miner {
                 (proof.claimable_rewards as f64) / (10f64.powf(ore::TOKEN_DECIMALS as f64));
             let reward_rate =
                 (treasury.reward_rate as f64) / (10f64.powf(ore::TOKEN_DECIMALS as f64));
-            stdout.write_all(b"\x1b[2J\x1b[3J\x1b[H").ok();
-            println!("Balance: {} ORE", balance);
-            println!("Claimable: {} ORE", rewards);
-            println!("Reward rate: {} ORE", reward_rate);
+
+            println!(
+                "{} - Balance: {} ORE, Claimable: {} ORE, Reward rate: {} ORE",
+                Local::now().format("%Y-%m-%d %H:%M:%S"),
+                balance,
+                rewards,
+                reward_rate
+            );
 
             // Escape sequence that clears the screen and the scrollback buffer
-            println!("\nMining for a valid hash...");
+            info!("\nMining for a valid hash...");
             let (next_hash, nonce) =
                 self.find_next_hash_par(proof.hash.into(), treasury.difficulty.into(), threads);
 
             // Submit mine tx.
             // Use busses randomly so on each epoch, transactions don't pile on the same busses
-            println!("\n\nSubmitting hash for validation...");
+            info!("\n\nSubmitting hash for validation...");
             'submit: loop {
                 // Double check we're submitting for the right challenge
                 let proof_ = get_proof(&self.rpc_client, signer.pubkey()).await;
@@ -62,7 +67,7 @@ impl Miner {
                     nonce,
                     treasury.difficulty.into(),
                 ) {
-                    println!("Hash already validated! An earlier transaction must have landed.");
+                    info!("Hash already validated! An earlier transaction must have landed.");
                     break 'submit;
                 }
 
@@ -73,7 +78,7 @@ impl Miner {
                 if clock.unix_timestamp.ge(&threshold) {
                     // There are a lot of miners right now, so randomly select into submitting tx
                     if rng.gen_range(0..RESET_ODDS).eq(&0) {
-                        println!("Sending epoch reset transaction...");
+                        info!("Sending epoch reset transaction...");
                         let cu_limit_ix =
                             ComputeBudgetInstruction::set_compute_unit_limit(CU_LIMIT_RESET);
                         let cu_price_ix =
@@ -88,7 +93,7 @@ impl Miner {
                 // Submit request.
                 let bus = self.find_bus_id(treasury.reward_rate).await;
                 let bus_rewards = (bus.rewards as f64) / (10f64.powf(ore::TOKEN_DECIMALS as f64));
-                println!("Sending on bus {} ({} ORE)", bus.id, bus_rewards);
+                info!("Sending on bus {} ({} ORE)", bus.id, bus_rewards);
                 let cu_limit_ix = ComputeBudgetInstruction::set_compute_unit_limit(CU_LIMIT_MINE);
                 let cu_price_ix =
                     ComputeBudgetInstruction::set_compute_unit_price(self.priority_fee);
@@ -103,7 +108,7 @@ impl Miner {
                     .await
                 {
                     Ok(sig) => {
-                        println!("Success: {}", sig);
+                        info!("Success: {}", sig);
                         break;
                     }
                     Err(_err) => {
@@ -139,7 +144,7 @@ impl Miner {
             if next_hash.le(&difficulty) {
                 break;
             } else {
-                println!("Invalid hash: {} Nonce: {:?}", next_hash.to_string(), nonce);
+                error!("Invalid hash: {} Nonce: {:?}", next_hash.to_string(), nonce);
             }
             nonce += 1;
         }
@@ -164,7 +169,6 @@ impl Miner {
                 std::thread::spawn({
                     let found_solution = found_solution.clone();
                     let solution = solution.clone();
-                    let mut stdout = stdout();
                     move || {
                         let n = u64::MAX.saturating_div(threads).saturating_mul(i);
                         let mut next_hash: KeccakHash;
@@ -179,18 +183,8 @@ impl Miner {
                                 if found_solution.load(std::sync::atomic::Ordering::Relaxed) {
                                     return;
                                 }
-                                if n == 0 {
-                                    stdout
-                                        .write_all(
-                                            format!("\r{}", next_hash.to_string()).as_bytes(),
-                                        )
-                                        .ok();
-                                }
                             }
                             if next_hash.le(&difficulty) {
-                                stdout
-                                    .write_all(format!("\r{}", next_hash.to_string()).as_bytes())
-                                    .ok();
                                 found_solution.store(true, std::sync::atomic::Ordering::Relaxed);
                                 let mut w_solution = solution.lock().expect("failed to lock mutex");
                                 *w_solution = (next_hash, nonce);

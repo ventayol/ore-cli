@@ -18,6 +18,8 @@ use solana_transaction_status::{TransactionConfirmationStatus, UiTransactionEnco
 
 use crate::Miner;
 
+use log::{error, info};
+
 const RPC_RETRIES: usize = 0;
 const SIMULATION_RETRIES: usize = 4;
 const GATEWAY_RETRIES: usize = 4;
@@ -80,11 +82,11 @@ impl Miner {
             match sim_res {
                 Ok(sim_res) => {
                     if let Some(err) = sim_res.value.err {
-                        println!("Simulaton error: {:?}", err);
+                        info!("Simulaton error: {:?}", err);
                         sim_attempts += 1;
                     } else if let Some(units_consumed) = sim_res.value.units_consumed {
                         if dynamic_cus {
-                            println!("Dynamic CUs: {:?}", units_consumed);
+                            info!("Dynamic CUs: {:?}", units_consumed);
                             let cu_budget_ix = ComputeBudgetInstruction::set_compute_unit_limit(
                                 units_consumed as u32 + 1000,
                             );
@@ -99,7 +101,7 @@ impl Miner {
                     }
                 }
                 Err(err) => {
-                    println!("Simulaton error: {:?}", err);
+                    error!("Simulaton error: {:?}", err);
                     sim_attempts += 1;
                 }
             }
@@ -118,10 +120,10 @@ impl Miner {
         // let mut sigs = vec![];
         let mut attempts = 0;
         loop {
-            println!("Attempt: {:?}", attempts);
+            info!("Attempt: {:?}", attempts);
             match client.send_transaction_with_config(&tx, send_cfg).await {
                 Ok(sig) => {
-                    println!("{:?}", sig);
+                    info!("{:?}", sig);
                     // sigs.push(sig);
 
                     // Confirm tx
@@ -132,7 +134,7 @@ impl Miner {
                         std::thread::sleep(Duration::from_millis(CONFIRM_DELAY));
                         match client.get_signature_statuses(&[sig]).await {
                             Ok(signature_statuses) => {
-                                println!("Confirmation: {:?}", signature_statuses.value[0]);
+                                info!("Confirmation: {:?}", signature_statuses.value[0]);
                                 for signature_status in signature_statuses.value {
                                     if let Some(signature_status) = signature_status.as_ref() {
                                         if signature_status.confirmation_status.is_some() {
@@ -144,7 +146,7 @@ impl Miner {
                                                 TransactionConfirmationStatus::Processed => {}
                                                 TransactionConfirmationStatus::Confirmed
                                                 | TransactionConfirmationStatus::Finalized => {
-                                                    println!("Transaction landed!");
+                                                    info!("Transaction landed!");
                                                     std::thread::sleep(Duration::from_millis(
                                                         GATEWAY_DELAY,
                                                     ));
@@ -152,7 +154,7 @@ impl Miner {
                                                 }
                                             }
                                         } else {
-                                            println!("No status");
+                                            info!("No status");
                                         }
                                     }
                                 }
@@ -160,16 +162,16 @@ impl Miner {
 
                             // Handle confirmation errors
                             Err(err) => {
-                                println!("{:?}", err.kind().to_string());
+                                error!("{:?}", err.kind().to_string());
                             }
                         }
                     }
-                    println!("Transaction did not land");
+                    info!("Transaction did not land");
                 }
 
                 // Handle submit errors
                 Err(err) => {
-                    println!("{:?}", err.kind().to_string());
+                    info!("{:?}", err.kind().to_string());
                 }
             }
 

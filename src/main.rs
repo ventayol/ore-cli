@@ -24,6 +24,10 @@ use solana_sdk::{
     signature::{read_keypair_file, Keypair},
 };
 
+use simplelog::*;
+use std::fs::File;
+use chrono::Local;
+
 struct Miner {
     pub keypair_filepath: Option<String>,
     pub priority_fee: u64,
@@ -189,6 +193,11 @@ async fn main() {
         solana_cli_config::Config::default()
     };
 
+    // Initialize logger
+    let log_file_name = format!("logs/miner_{}.log", Local::now().format("%Y%m%d%H%M%S"));
+    println!("Starting with log file {}", log_file_name);
+    let _ = WriteLogger::init(LevelFilter::Info, Config::default(), File::create(log_file_name).unwrap());
+        
     // Initialize miner.
     let cluster = args.rpc.unwrap_or(cli_config.json_rpc_url);
     let default_keypair = args.keypair.unwrap_or(cli_config.keypair_path);
