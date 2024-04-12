@@ -4,8 +4,7 @@ use std::{
 };
 
 use solana_client::{
-    client_error::{ClientError, ClientErrorKind, Result as ClientResult},
-    rpc_config::{RpcSendTransactionConfig, RpcSimulateTransactionConfig},
+    client_error::{ClientError, ClientErrorKind, Result as ClientResult}, rpc_client::SerializableTransaction, rpc_config::{RpcSendTransactionConfig, RpcSimulateTransactionConfig}
 };
 use solana_program::instruction::Instruction;
 use solana_sdk::{
@@ -22,11 +21,11 @@ use log::{error, info};
 
 const RPC_RETRIES: usize = 0;
 const SIMULATION_RETRIES: usize = 4;
-const GATEWAY_RETRIES: usize = 4;
-const CONFIRM_RETRIES: usize = 4;
+const GATEWAY_RETRIES: usize = 30;
+const CONFIRM_RETRIES: usize = 5;
 
-const CONFIRM_DELAY: u64 = 0;
-const GATEWAY_DELAY: u64 = 300;
+const CONFIRM_DELAY: u64 = 100;
+const GATEWAY_DELAY: u64 = 5000;
 
 impl Miner {
     pub async fn send_and_confirm(
@@ -123,24 +122,25 @@ impl Miner {
 
         // Submit tx
         tx.sign(&[&signer], hash);
-        // let mut sigs = vec![];
+        info!("Sending transaction: {:?}", tx.get_signature());
         let mut attempts = 0;
         loop {
             info!("Attempt: {:?}", attempts);
             match client.send_transaction_with_config(&tx, send_cfg).await {
                 Ok(sig) => {
-                    info!("{:?}", sig);
+                    // info!("{:?}", sig);
                     // sigs.push(sig);
 
                     // Confirm tx
                     if skip_confirm {
                         return Ok(sig);
                     }
+                    // print!("Confirmation: ");
                     for _ in 0..CONFIRM_RETRIES {
                         std::thread::sleep(Duration::from_millis(CONFIRM_DELAY));
                         match client.get_signature_statuses(&[sig]).await {
                             Ok(signature_statuses) => {
-                                info!("Confirmation: {:?}", signature_statuses.value[0]);
+                            //    print!("{:?}", signature_statuses.value[0]);
                                 for signature_status in signature_statuses.value {
                                     if let Some(signature_status) = signature_status.as_ref() {
                                         if signature_status.confirmation_status.is_some() {
@@ -172,7 +172,7 @@ impl Miner {
                             }
                         }
                     }
-                    info!("Transaction did not land");
+                    // info!("Transaction did not land");
                 }
 
                 // Handle submit errors

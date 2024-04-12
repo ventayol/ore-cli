@@ -42,8 +42,9 @@ impl Miner {
                 (treasury.reward_rate as f64) / (10f64.powf(ore::TOKEN_DECIMALS as f64));
 
             println!(
-                "{} - Balance: {} ORE, Claimable: {} ORE, Reward rate: {} ORE, Fee: {}",
+                "{} - Account: {}\tBalance: {:.6}\tClaimable: {:.6}\tReward: {:.6}\tFee: {}",
                 Local::now().format("%Y-%m-%d %H:%M:%S"),
+                signer.pubkey().to_string().chars().take(6).collect::<String>(),
                 balance,
                 rewards,
                 reward_rate,
@@ -51,13 +52,12 @@ impl Miner {
             );
 
             // Escape sequence that clears the screen and the scrollback buffer
-            info!("\nMining for a valid hash...");
-            let (next_hash, nonce) =
-                self.find_next_hash_par(proof.hash.into(), treasury.difficulty.into(), threads);
-
+            info!("Mining for a valid hash...");
+            let (next_hash, nonce) = self.find_next_hash_par(proof.hash.into(), treasury.difficulty.into(), threads);
+            info!("Found a valid hash: {} with nonce: {}", next_hash.to_string(), nonce);
             // Submit mine tx.
             // Use busses randomly so on each epoch, transactions don't pile on the same busses
-            info!("\n\nSubmitting hash for validation...");
+            info!("Submitting hash for validation {} ...", next_hash.to_string());
             'submit: loop {
                 // Double check we're submitting for the right challenge
                 let proof_ = get_proof(&self.rpc_client, signer.pubkey()).await;

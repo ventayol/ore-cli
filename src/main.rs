@@ -22,11 +22,11 @@ use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
     commitment_config::CommitmentConfig,
     signature::{read_keypair_file, Keypair},
+    signature::Signer,
 };
 
 use simplelog::*;
 use std::fs::File;
-use chrono::Local;
 
 struct Miner {
     pub keypair_filepath: Option<String>,
@@ -138,7 +138,7 @@ struct MineArgs {
         short,
         value_name = "THREAD_COUNT",
         help = "The number of threads to dedicate to mining",
-        default_value = "1"
+        default_value = "20"
     )]
     threads: u64,
 }
@@ -193,11 +193,6 @@ async fn main() {
         solana_cli_config::Config::default()
     };
 
-    // Initialize logger
-    let log_file_name = format!("logs/miner_{}.log", Local::now().format("%Y%m%d%H%M%S"));
-    println!("Starting with log file {}", log_file_name);
-    let _ = WriteLogger::init(LevelFilter::Info, Config::default(), File::create(log_file_name).unwrap());
-        
     // Initialize miner.
     let cluster = args.rpc.unwrap_or(cli_config.json_rpc_url);
     let default_keypair = args.keypair.unwrap_or(cli_config.keypair_path);
@@ -208,6 +203,15 @@ async fn main() {
         args.priority_fee,
         Some(default_keypair),
     ));
+
+    // Initialize logger
+    let log_file_name = format!("logs/miner_{}.log", miner.signer().pubkey().to_string().chars().take(6).collect::<String>());
+    println!("Starting with log file {}", log_file_name);
+    let _ = WriteLogger::init(
+        LevelFilter::Info,
+        Config::default(),
+        File::create(log_file_name).unwrap(),
+    );
 
     // Execute user command.
     match args.command {
@@ -245,7 +249,11 @@ async fn main() {
 }
 
 impl Miner {
-    pub fn new(rpc_client: Arc<RpcClient>, priority_fee: u64, keypair_filepath: Option<String>) -> Self {
+    pub fn new(
+        rpc_client: Arc<RpcClient>,
+        priority_fee: u64,
+        keypair_filepath: Option<String>,
+    ) -> Self {
         Self {
             rpc_client,
             keypair_filepath,
