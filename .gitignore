@@ -4,3 +4,4 @@ logs/
 wallets/
 *.sh
 *.log
+utils/*
